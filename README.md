@@ -96,21 +96,73 @@ cp .env.example .env      # then edit .env with your values
 `.env` holds `URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `GOOGLE_API_KEY`.
 It is gitignored — never commit it.
 
-### 2. Build the graph (one time)
-Run [`cypher/build_KG_queries.cypher`](cypher/build_KG_queries.cypher) inside
-Neo4j:
-- **Local Neo4j** — copy `data/cases.csv` into Neo4j's `import/` folder, then run
-  the script (it reads `file:///cases.csv`).
-- **Neo4j Aura** — `file:///` is not available; change the first line to load
-  from a URL, e.g.
-  `LOAD CSV WITH HEADERS FROM 'https://raw.githubusercontent.com/ahmadsameh8/KE/staging/data/cases.csv' AS row`.
+### 2. Set up Neo4j and build the graph (one time)
 
-Verify the load:
+Host the graph either locally with **Neo4j Desktop** or in the cloud with
+**Neo4j Aura**. Build it once — the app only reads from it afterwards.
+
+#### Option A — Build the KG on Neo4j Desktop (local)
+
+1. Download and install **Neo4j Desktop** — https://neo4j.com/download/.
+2. Create a database: **+ New** → **Create project**, then inside the project
+   **Add → Local DBMS**. Give it a name, set a **password** (remember it), pick a
+   recent version, and click **Create**.
+3. **Start** the DBMS (press ▶). Once it's running, the Bolt address is
+   `neo4j://127.0.0.1:7687` and the user is `neo4j`.
+4. Make the CSV reachable by `LOAD CSV`: click the DBMS → the **`…`** menu →
+   **Open folder → Import**, and copy this repo's `data/cases.csv` into that
+   `import/` folder.
+5. Open **Neo4j Browser** (the **Open** button) or the **Query** tab.
+6. Paste the contents of
+   [`cypher/build_KG_queries.cypher`](cypher/build_KG_queries.cypher) and run it.
+   It reads `file:///cases.csv` from the import folder you just used.
+7. (Optional) run [`cypher/visualize_KG_query.cypher`](cypher/visualize_KG_query.cypher)
+   to see the graph in Browser.
+8. Put the local connection in your `.env`:
+   ```env
+   URI=neo4j://127.0.0.1:7687
+   NEO4J_USERNAME=neo4j
+   NEO4J_PASSWORD=<the password you set in step 2>
+   ```
+
+#### Option B — Use Neo4j Aura (cloud)
+
+1. Go to **https://console.neo4j.io**, sign in, and **Create instance**
+   (the Free tier is enough).
+2. On creation the **password is shown once** — download/save the credentials
+   file. The username is always `neo4j`, and the **Connection URI** looks like
+   `neo4j+s://<id>.databases.neo4j.io`.
+3. Aura has **no local import folder**, so load the CSV from a URL. Open the
+   Aura **Query** tab, paste
+   [`cypher/build_KG_queries.cypher`](cypher/build_KG_queries.cypher), and change
+   only its **first line** to:
+   ```cypher
+   LOAD CSV WITH HEADERS FROM 'https://raw.githubusercontent.com/ahmadsameh8/KE/staging/data/cases.csv' AS row
+   ```
+   then run it.
+4. Put the Aura connection in your `.env`:
+   ```env
+   URI=neo4j+s://<id>.databases.neo4j.io
+   NEO4J_USERNAME=neo4j
+   NEO4J_PASSWORD=<your-aura-password>
+   ```
+   > Aura Free instances **pause after a few days idle** (and are deleted after
+   > ~30 days paused). If the app can't connect, resume the instance from the
+   > console first.
+
+#### Verify the load (either option)
 ```cypher
 MATCH (n) RETURN labels(n)[0] AS label, count(*) ORDER BY count(*) DESC;
 ```
+You should see ~10,919 `Case` nodes plus `Company`, `Section`, and `LegalBasis`.
 
-### 3. Run the app
+### 3. Run the natural-language dashboard (the app)
+
+The Streamlit app is the natural-language interface to the graph: ask a question
+and get a written answer plus an interactive graph. It works against whichever
+instance you configured in `.env` — local **Neo4j Desktop** or cloud **Neo4j
+Aura** — no code change needed; only the `URI`/credentials differ.
+
 ```bash
 uv run streamlit run app/chat.py
 ```
@@ -121,6 +173,10 @@ Quick connectivity checks:
 uv run python -m src.db       # prints "Connected" + node counts
 uv run python -m src.chain    # answers a sample question (needs the API key)
 ```
+
+> **Tip:** use Neo4j Desktop while developing/building the graph locally, then
+> point `.env` at a Neo4j Aura instance to run the dashboard against the cloud
+> graph (e.g. for sharing or deployment).
 
 ---
 
