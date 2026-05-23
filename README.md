@@ -19,6 +19,10 @@ Built with **LangChain + Google Gemini** (text-to-Cypher), **Neo4j**, and
   subgraph (Cases, Companies, Sectors, Legal bases) as an interactive network.
 - **Transparent** — every answer exposes the generated Cypher.
 
+Two interfaces are included: a **Streamlit chatbot** (this app) and a **NeoDash
+dashboard** on Neo4j Aura that turns natural-language requests into Cypher and
+renders graph / table / chart panels.
+
 ## The knowledge graph
 
 | Node | Key properties |
@@ -52,17 +56,13 @@ Relationships: `(:Case)-[:INVOLVES_COMPANY]->(:Company)`,
 │   ├── build_KG_queries.cypher # LOAD CSV → builds the graph
 │   └── visualize_KG_query.cypher
 ├── data/
-│   └── cases.csv               # Graph input (10,919 cases)
-├── test/                       # 8 leveled Cypher ground-truth test sets
+│   └── cases.csv               # Graph input 
+├── test/                       
 ├── notebooks/                  # Data pipeline + exploratory analysis
-│   ├── data.ipynb              # merge raw case JSON
 │   ├── Cleaning.ipynb          # raw JSON → cases.json → cases.csv
 │   ├── analysis.ipynb          # exploratory data analysis
-│   ├── knowledge_graph.ipynb   # graph construction / inspection
 │   ├── Data/                   # raw EU case JSON (inputs)
-│   └── cases.json, cases.csv   # intermediate / output
-├── docs/
-│   └── KE_Proposal.docx        # project proposal
+│ 
 ├── .env.example                # template for required credentials
 └── pyproject.toml
 ```
@@ -101,7 +101,7 @@ It is gitignored — never commit it.
 Host the graph either locally with **Neo4j Desktop** or in the cloud with
 **Neo4j Aura**. Build it once — the app only reads from it afterwards.
 
-#### Option A — Build the KG on Neo4j Desktop (local)
+#### Build the KG on Neo4j Desktop (local)
 
 1. Download and install **Neo4j Desktop** — https://neo4j.com/download/.
 2. Create a database: **+ New** → **Create project**, then inside the project
@@ -125,43 +125,13 @@ Host the graph either locally with **Neo4j Desktop** or in the cloud with
    NEO4J_PASSWORD=<the password you set in step 2>
    ```
 
-#### Option B — Use Neo4j Aura (cloud)
+### 3. Run the chatbot (the Streamlit app)
 
-1. Go to **https://console.neo4j.io**, sign in, and **Create instance**
-   (the Free tier is enough).
-2. On creation the **password is shown once** — download/save the credentials
-   file. The username is always `neo4j`, and the **Connection URI** looks like
-   `neo4j+s://<id>.databases.neo4j.io`.
-3. Aura has **no local import folder**, so load the CSV from a URL. Open the
-   Aura **Query** tab, paste
-   [`cypher/build_KG_queries.cypher`](cypher/build_KG_queries.cypher), and change
-   only its **first line** to:
-   ```cypher
-   LOAD CSV WITH HEADERS FROM 'https://raw.githubusercontent.com/ahmadsameh8/KE/staging/data/cases.csv' AS row
-   ```
-   then run it.
-4. Put the Aura connection in your `.env`:
-   ```env
-   URI=neo4j+s://<id>.databases.neo4j.io
-   NEO4J_USERNAME=neo4j
-   NEO4J_PASSWORD=<your-aura-password>
-   ```
-   > Aura Free instances **pause after a few days idle** (and are deleted after
-   > ~30 days paused). If the app can't connect, resume the instance from the
-   > console first.
-
-#### Verify the load (either option)
-```cypher
-MATCH (n) RETURN labels(n)[0] AS label, count(*) ORDER BY count(*) DESC;
-```
-You should see ~10,919 `Case` nodes plus `Company`, `Section`, and `LegalBasis`.
-
-### 3. Run the natural-language dashboard (the app)
-
-The Streamlit app is the natural-language interface to the graph: ask a question
-and get a written answer plus an interactive graph. It works against whichever
-instance you configured in `.env` — local **Neo4j Desktop** or cloud **Neo4j
-Aura** — no code change needed; only the `URI`/credentials differ.
+The Streamlit app is the **chatbot**: ask a question in plain English and get a
+written answer plus an interactive graph of the nodes/relationships behind it.
+It works against whichever instance you configured in `.env` — local **Neo4j
+Desktop** or cloud **Neo4j Aura** — no code change needed; only the
+`URI`/credentials differ.
 
 ```bash
 uv run streamlit run app/chat.py
@@ -174,9 +144,41 @@ uv run python -m src.db       # prints "Connected" + node counts
 uv run python -m src.chain    # answers a sample question (needs the API key)
 ```
 
-> **Tip:** use Neo4j Desktop while developing/building the graph locally, then
-> point `.env` at a Neo4j Aura instance to run the dashboard against the cloud
-> graph (e.g. for sharing or deployment).
+> **Tip:** the chatbot runs against either instance — build/develop locally on
+> Neo4j Desktop, or point `.env` at Neo4j Aura for a cloud graph.
+
+### 4. Explore on Neo4j Aura with NeoDash (natural-language dashboard)
+
+A second interface: a **NeoDash** dashboard on a **Neo4j Aura** graph, where you
+type questions in natural language, NeoDash's AI translates them into Cypher, and
+the results render as interactive **graph / table / chart** panels.
+
+**a. Put the graph on Aura.** Create a free instance at
+https://console.neo4j.io and save the credentials (user `neo4j`, URI
+`neo4j+s://<id>.databases.neo4j.io`). Aura has no import folder, so load the CSV
+from a URL — open the Aura **Query** tab, paste
+[`cypher/build_KG_queries.cypher`](cypher/build_KG_queries.cypher), and change its
+first line to:
+```cypher
+LOAD CSV WITH HEADERS FROM 'https://raw.githubusercontent.com/ahmadsameh8/KE/staging/data/cases.csv' AS row
+```
+
+**b. Open NeoDash and connect to Aura.** Launch NeoDash
+(https://neodash.graphapp.io, or from Neo4j Desktop / the Aura console), choose
+**New dashboard**, and connect with your Aura details (protocol `neo4j+s`, host
+`<id>.databases.neo4j.io`, port `7687`, database `neo4j`, user `neo4j`, your
+password).
+
+**c. Enable natural-language reports.** In NeoDash **Settings**, turn on the AI
+assistant and provide an LLM provider API key (e.g. OpenAI).
+
+**d. Build the dashboard.** Add a report → choose **"generate query with AI"** →
+type a question in English (e.g. *"Top 10 sectors by number of cases"*). NeoDash
+generates the Cypher; pick a visualization (Graph, Table, Bar chart, …) and the
+panel renders. Repeat to assemble a multi-panel dashboard.
+
+> Aura Free instances pause after a few days idle (and are deleted after ~30 days
+> paused) — resume from the console if NeoDash can't connect.
 
 ---
 
