@@ -103,7 +103,7 @@ Neo4j:
   the script (it reads `file:///cases.csv`).
 - **Neo4j Aura** — `file:///` is not available; change the first line to load
   from a URL, e.g.
-  `LOAD CSV WITH HEADERS FROM 'https://raw.githubusercontent.com/ahmadsameh8/KE/main/data/cases.csv' AS row`.
+  `LOAD CSV WITH HEADERS FROM 'https://raw.githubusercontent.com/ahmadsameh8/KE/staging/data/cases.csv' AS row`.
 
 Verify the load:
 ```cypher
