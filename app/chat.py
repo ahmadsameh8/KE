@@ -11,8 +11,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import streamlit as st
+import streamlit.components.v1 as components
 from src.chain import build_chain
-from src.db import cypher
+from src.viz import subgraph_for_question, to_html
 
 
 # ----------------------------- page config --------------------------------- #
@@ -37,29 +38,37 @@ def get_chain():
     return build_chain(verbose=False)
 
 
-@st.cache_data(ttl=600, show_spinner=False)
-def get_stats():
-    """Quick stats for the sidebar — refreshed every 10 minutes."""
-    df = cypher("""
-        MATCH (n)
-        RETURN labels(n)[0] AS label, count(*) AS count
-        ORDER BY count DESC
-    """)
-    return df
-
-
 chain = get_chain()
+
+
+# ------------------------------ render helpers ----------------------------- #
+
+def render_extras(msg: dict) -> None:
+    """Render the answer's graph inline, plus the Cypher in a details panel."""
+    # The graph of the retrieved answer — shown right under the text answer.
+    if msg.get("graph_html"):
+        st.markdown(
+            f"**🕸️ Graph of the answer** — {msg.get('graph_n', 0)} nodes, "
+            f"{msg.get('graph_e', 0)} relationships"
+        )
+        components.html(msg["graph_html"], height=500, scrolling=True)
+    elif msg.get("graph_error"):
+        st.caption(f"⚠️ Couldn't build the graph: {msg['graph_error']}")
+
+    # Cypher tucked away so it doesn't crowd the answer + graph.
+    if msg.get("cypher") or msg.get("viz_cypher"):
+        with st.expander("View Cypher"):
+            if msg.get("cypher"):
+                st.caption("Answer query")
+                st.code(msg["cypher"], language="cypher")
+            if msg.get("viz_cypher"):
+                st.caption("Graph query")
+                st.code(msg["viz_cypher"], language="cypher")
 
 
 # ------------------------------- sidebar ----------------------------------- #
 
 with st.sidebar:
-    st.header("📊 Graph at a glance")
-    stats = get_stats()
-    for _, row in stats.iterrows():
-        st.metric(row["label"], f"{row['count']:,}")
-
-    st.divider()
     st.subheader("💡 Try asking")
     examples = [
         "How many cases are in the dataset?",
@@ -75,6 +84,11 @@ with st.sidebar:
             st.session_state["queued_question"] = ex
 
     st.divider()
+    show_graph = st.toggle(
+        "🕸️ Show answer subgraph",
+        value=True,
+        help="Also draw the nodes and relationships each answer is based on.",
+    )
     if st.button("🗑️ Clear chat", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
@@ -89,9 +103,8 @@ if "messages" not in st.session_state:
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
-        if msg.get("cypher"):
-            with st.expander("View generated Cypher"):
-                st.code(msg["cypher"], language="cypher")
+        if msg["role"] == "assistant":
+            render_extras(msg)
 
 
 # ---------------------- handle the next user message ---------------------- #
@@ -119,13 +132,32 @@ if question:
             answer = f"⚠️ Sorry, I couldn't answer that.\n\n```\n{e}\n```"
             cypher_used = None
 
-        st.markdown(answer)
-        if cypher_used:
-            with st.expander("View generated Cypher"):
-                st.code(cypher_used, language="cypher")
+        # Build the graph of the retrieved answer (best-effort).
+        viz_cypher, graph_html = None, None
+        graph_n, graph_e, graph_error = 0, 0, None
+        if show_graph and cypher_used:
+            try:
+                with st.spinner("Building graph…"):
+                    viz_cypher, nodes, edges = subgraph_for_question(question)
+                if nodes:
+                    graph_html = to_html(nodes, edges)
+                    graph_n, graph_e = len(nodes), len(edges)
+                else:
+                    graph_error = "the query returned no nodes to draw."
+            except Exception as e:
+                graph_error = str(e)
 
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": answer,
-        "cypher": cypher_used,
-    })
+        st.markdown(answer)
+        msg = {
+            "role": "assistant",
+            "content": answer,
+            "cypher": cypher_used,
+            "viz_cypher": viz_cypher,
+            "graph_html": graph_html,
+            "graph_n": graph_n,
+            "graph_e": graph_e,
+            "graph_error": graph_error,
+        }
+        render_extras(msg)
+
+    st.session_state.messages.append(msg)

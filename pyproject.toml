@@ -1,7 +1,7 @@
 [project]
-name = "coding"
+name = "eu-competition-cases-kg"
 version = "0.1.0"
-description = "Add your description here"
+description = "Natural-language Q&A and graph visualisation over a Neo4j knowledge graph of EU competition cases (LangChain + Gemini)."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -13,6 +13,7 @@ dependencies = [
     "matplotlib>=3.10.9",
     "neo4j>=6.2.0",
     "pandas>=3.0.3",
+    "pyvis>=0.3.2",
     "seaborn>=0.13.2",
     "streamlit>=1.57.0",
 ]

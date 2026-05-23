@@ -1,6 +1,6 @@
 LOAD CSV WITH HEADERS FROM 'file:///cases.csv' AS row
 // --- Create Case node ---
-MERGE (c:Case {caseNumber: row.caseNumber})
+MERGE (c:Case {caseNumber: toInteger(row.caseNumber)})
 SET 
     c.caseTitle = row.caseTitle,
     c.caseInstrument = row.caseInstrument,
@@ -23,9 +23,9 @@ SET
 MERGE (s:Section {name: row.sectionName})
 SET 
     s.sectionCode = row.sectionCode,
-    s.division = row.division,
-    s.group = row.group,
-    s.classCode = row.classCode,
+    s.division = toInteger(row.division),
+    s.group = toInteger(row.group),
+    s.classCode = toInteger(row.classCode),
     s.classDescription = row.classDescription,
     s.displayName = row.sectionName
 MERGE (c)-[:HAS_SECTION]->(s)

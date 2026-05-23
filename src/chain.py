@@ -18,7 +18,7 @@ load_dotenv()
 
 
 def build_chain(
-    model: str = "gemma-3-27b-it",
+    model: str = "gemini-3.1-flash-lite-preview",
     temperature: float = 0.0,
     verbose: bool = False,
 ):

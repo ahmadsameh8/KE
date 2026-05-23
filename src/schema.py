@@ -4,8 +4,8 @@ Node properties:
         caseInitiationDate: DATE, caseLastDecisionDate: DATE,
         displayName: STRING}
 - Company {name: STRING, displayName: STRING}
-- Section {name: STRING, sectionCode: STRING, division: FLOAT,
-           group: FLOAT, classCode: FLOAT, classDescription: STRING,
+- Section {name: STRING, sectionCode: STRING, division: INTEGER,
+           group: INTEGER, classCode: INTEGER, classDescription: STRING,
            displayName: STRING}
 - LegalBasis {name: STRING, displayName: STRING}
 
